@@ -22,14 +22,17 @@ class Louvain(object):
     @classmethod
     def run(cls, graph):
         node2com, edge_weights = cls._setNode2Com(graph)
+        all_edge_weights = graph.size(weight="weight")
 
-        node2com = cls._runInitFirstPhase(node2com, edge_weights, graph)
+        node2com = cls._runInitFirstPhase(node2com, edge_weights, all_edge_weights, graph)
         node2coms = [node2com]
         cls.show(node2com)
+        print()
 
         new_node2com, new_edge_weights = cls._runSecondPhase(node2com, edge_weights)
         node2coms.append(new_node2com)
         cls.show(new_node2com)
+        print()
 
         while True:
             new_node2com = cls._runFirstPhase(new_node2com, new_edge_weights)
@@ -38,10 +41,7 @@ class Louvain(object):
             sys.exit()
 
     @classmethod
-    def _runInitFirstPhase(cls, node2com, edge_weights, graph):
-        node2com, edge_weights = cls._setNode2Com(graph)
-        all_edge_weights = graph.size(weight="weight")
-
+    def _runInitFirstPhase(cls, node2com, edge_weights, all_edge_weights, graph):
         status = True
         while status:
             print(sorted(graph.nodes()))
@@ -49,7 +49,6 @@ class Louvain(object):
             for node in sorted(graph.nodes()):
                 statuses = []
                 com_id = node2com[node]
-                # neigh_clusters = list(set([node2com[neigh_node] for neigh_node in graph[node].keys()]))
                 neigh_nodes = list(graph[node].keys())
 
                 max_delta = 0.
@@ -60,13 +59,11 @@ class Louvain(object):
                     node2com_copy[node] = node2com_copy[neigh_node]
 
                     # 隣接クラスタに移動した際のModularityの差分
-                    # delta_q = (1. / (2 * all_edge_weights)) * (cls.getNodeWeightInCluster(node, node2com_copy, edge_weights, graph) -
-                    #                                    ((cls.getTotWeight(com_id, node2com_copy, edge_weights) * cls.getNodeWeights(node, graph)) / (2 * all_edge_weights)))
-                    delta_q = 2 * cls.getNodeWeightInCluster(node, node2com_copy, edge_weights, graph) - cls.getTotWeight(node, node2com_copy, edge_weights) * cls.getNodeWeights(node, graph) / all_edge_weights
+                    delta_q = 2 * cls.getNodeWeightInCluster(node, node2com_copy, edge_weights, graph) - cls.getTotWeight(node, node2com_copy, edge_weights) * cls.getNodeWeights(node, edge_weights) / all_edge_weights
                     print("neighbor_id: {}, k_i_in: {}, tot: {}, k_i: {}, max_delta: {}".format(neigh_node,
                                                                                cls.getNodeWeightInCluster(node, node2com_copy, edge_weights, graph),
                                                                                cls.getTotWeight(node, node2com_copy, edge_weights),
-                                                                               cls.getNodeWeights(node, graph),
+                                                                               cls.getNodeWeights(node, edge_weights),
                                                                                delta_q))
 
                     if delta_q > max_delta:
@@ -76,7 +73,7 @@ class Louvain(object):
 
                 print("k_i_in: {}, tot: {}, k_i: {}, max_delta: {}".format(cls.getNodeWeightInCluster(node, node2com_copy, edge_weights, graph),
                                                             cls.getTotWeight(node, max_n, edge_weights),
-                                                            cls.getNodeWeights(node, graph),
+                                                            cls.getNodeWeights(node, edge_weights),
                                                             max_delta))
                 print(node2com, max_com_id)
                 node2com[node] = max_com_id
@@ -108,11 +105,6 @@ class Louvain(object):
             if com_id not in new_node2com:
                 new_node2com[com_id] = com_id
 
-        # cluster内エッジの重み
-        # for com_id in com2node.keys():
-        #     cluster_weight = cls.getWeightsInCluster(com_id, node2com, edge_weights)
-        #     new_edge_weights[com_id][com_id] = cluster_weight ** 2
-
         # cluster間エッジの重み
         nodes = list(node2com.keys())
         for edge in permutations(nodes, 2):
@@ -137,14 +129,6 @@ class Louvain(object):
         return weight
 
     @classmethod
-    def getWeightsInCluster(cls, com_id, node2com, edge_weights):
-        nodes = [node for node, com in node2com.items() if com == com_id]
-        edges = combinations(nodes, 2)
-        cluster_weight = sum([edge_weights[edge[0]][edge[1]] for edge in edges])
-
-        return cluster_weight, nodes
-
-    @classmethod
     def getNodeWeightInCluster(cls, node, node2com, edge_weights, graph):
         # nodeに接続しているcluster内のedgeの重みの総和
         neigh_nodes = graph[node].items()
@@ -157,8 +141,12 @@ class Louvain(object):
         return weights
 
     @classmethod
-    def getNodeWeights(cls, node, graph):
+    def _getNodeWeights(cls, node, graph):
         return graph.degree(node, weight="weight")
+
+    @classmethod
+    def getNodeWeights(cls, node, edge_weights):
+        return sum([weight for weight in edge_weights[node].values()])
 
     @classmethod
     def _setNode2Com(cls, graph):
