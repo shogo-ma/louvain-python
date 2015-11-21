@@ -10,7 +10,7 @@ from collections import defaultdict
 class Louvain(object):
 
     @classmethod
-    def best_partition(cls, graph):
+    def getBestPartition(cls, graph):
         node2com, edge_weights = cls._setNode2Com(graph)
 
         node2com = cls._runFirstPhase(node2com, edge_weights)
