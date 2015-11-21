@@ -2,7 +2,7 @@
 
 import networkx as nx
 
-from pylouvain import Louvain
+from louvain import Louvain
 from collections import defaultdict
 
 def makeSampleGraph():
