@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
-import sys
 import copy
 
 from itertools import permutations
@@ -11,32 +10,21 @@ from collections import defaultdict
 class Louvain(object):
 
     @classmethod
-    def show(cls, node2com):
-        com2node = defaultdict(list)
-        for node, com_id in node2com.items():
-            com2node[com_id].append(node)
-
-        for com_id, nodes in com2node.items():
-            print("com_id: {}, nodes: {}".format(com_id, ", ".join([str(node) for node in nodes])), file=sys.stderr)
-
-    @classmethod
-    def run(cls, graph):
+    def best_partition(cls, graph):
         node2com, edge_weights = cls._setNode2Com(graph)
 
         node2com = cls._runFirstPhase(node2com, edge_weights)
         best_modularity = cls.computeModularity(node2com, edge_weights)
-        print("modularity: {}".format(best_modularity))
-        cls.show(node2com)
 
         partition = copy.deepcopy(node2com)
         new_node2com, new_edge_weights = cls._runSecondPhase(node2com, edge_weights)
-        cls.show(new_node2com)
 
         while True:
             new_node2com = cls._runFirstPhase(new_node2com, new_edge_weights)
-            modularity = cls.computeModularity(node2com, new_edge_weights)
+            modularity = cls.computeModularity(new_node2com, new_edge_weights)
             if best_modularity == modularity:
                 break
+            best_modularity = modularity
             partition = cls._updatePartition(new_node2com, partition)
             _new_node2com, _new_edge_weights = cls._runSecondPhase(new_node2com, new_edge_weights)
             new_node2com = _new_node2com
@@ -54,15 +42,11 @@ class Louvain(object):
 
         for com_id, nodes in com2node.items():
             node_combinations = list(combinations(nodes, 2)) + [(node, node) for node in nodes]
-            # weights = sum([edge_weights[node_pair[0]][node_pair[1]] for node_pair in node_combinations])
             cluster_weight = 0.
             for node_pair in node_combinations:
                 cluster_weight += edge_weights[node_pair[0]][node_pair[1]]
             tot = cls.getDegreeOfCluster(nodes, node2com, edge_weights)
-            q += (cluster_weight / 2 * all_edge_weights) - (tot / 2 * all_edge_weights) ** 2
-            print("edge_weights: {}".format(edge_weights))
-            print("cluster_weight: {}, tot: {}".format(cluster_weight, tot))
-            print("partition[{}]: {}".format(com_id, nodes))
+            q += (cluster_weight / (2 * all_edge_weights)) - (tot / (2 * all_edge_weights)) ** 2
         return q
 
     @classmethod
@@ -73,9 +57,13 @@ class Louvain(object):
     @classmethod
     def _updatePartition(cls, new_node2com, partition):
         # new_node2com : {'古いcom_id' : "新しいcom_id"}
-        reverse_partition = {v:k for k,v in partition.items()}
+        reverse_partition = defaultdict(list)
+        for node, com_id in partition.items():
+            reverse_partition[com_id].append(node)
+
         for old_com_id, new_com_id in new_node2com.items():
-            partition[reverse_partition[old_com_id]] = new_com_id
+            for old_com in reverse_partition[old_com_id]:
+                partition[old_com] = new_com_id
         return partition
 
     @classmethod
@@ -91,36 +79,20 @@ class Louvain(object):
 
                 max_delta = 0.
                 max_com_id = com_id
-                max_n = None
                 communities = {}
                 for neigh_node in sorted(neigh_nodes):
                     node2com_copy = copy.deepcopy(node2com)
-                    print("copy: {}, neigh_nodes: {}".format(node2com_copy, neigh_nodes))
                     if node2com_copy[neigh_node] in communities:
                         continue
                     communities[node2com_copy[neigh_node]] = 1
                     node2com_copy[node] = node2com_copy[neigh_node]
 
-                    # 隣接クラスタに移動した際のModularityの差分
                     delta_q = 2 * cls.getNodeWeightInCluster(node, node2com_copy, edge_weights) - cls.getTotWeight(node, node2com_copy, edge_weights) * cls.getNodeWeights(node, edge_weights) / all_edge_weights
-                    # print("neighbor_id: {}, k_i_in: {}, tot: {}, k_i: {}, max_delta: {}".format(neigh_node,
-                    #                                                           cls.getNodeWeightInCluster(node, node2com_copy, edge_weights),
-                    #                                                           cls.getTotWeight(node, node2com_copy, edge_weights),
-                    #                                                           cls.getNodeWeights(node, edge_weights),
-                    #                                                           delta_q))
-
                     if delta_q > max_delta:
                         max_delta = delta_q
                         max_com_id = node2com_copy[neigh_node]
-                        max_n = copy.deepcopy(node2com_copy)
 
-                #print("k_i_in: {}, tot: {}, k_i: {}, max_delta: {}".format(cls.getNodeWeightInCluster(node, node2com_copy, edge_weights),
-                #                                            cls.getTotWeight(node, max_n, edge_weights),
-                #                                            cls.getNodeWeights(node, edge_weights),
-                #                                            max_delta))
-                #print(node2com, max_com_id)
                 node2com[node] = max_com_id
-                #print(com_id, max_com_id)
                 statuses.append(com_id != max_com_id)
 
             if sum(statuses) == 0:
@@ -141,16 +113,10 @@ class Louvain(object):
                 new_node2com[com_id] = com_id
 
         nodes = list(node2com.keys())
-        for edge in permutations(nodes, 2):
-            if edge[0] not in edge_weights: continue
-            if edge[1] not in edge_weights[edge[0]]: continue
+        node_pairs = list(permutations(nodes, 2)) + [(node, node) for node in nodes]
+        for edge in node_pairs:
             new_edge_weights[new_node2com[node2com[edge[0]]]][new_node2com[node2com[edge[1]]]] += edge_weights[edge[0]][edge[1]]
-
-        for node in new_node2com.keys():
-            new_edge_weights[node][node] = (new_edge_weights[node][node] / 2) ** 2
-
         return new_node2com, new_edge_weights
-
 
     @classmethod
     def getTotWeight(cls, node, node2com, edge_weights):
