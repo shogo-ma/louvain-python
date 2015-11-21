@@ -36,10 +36,12 @@ class Louvain(object):
             _new_node2com, _new_edge_weights = cls._runSecondPhase(new_node2com, new_edge_weights)
             if new_node2com == _new_node2com:
                 break
+            new_node2com = _new_node2com
+            new_edge_weights = _new_edge_weights
         return partition
 
     @classmethod
-    def computeModularity(cls):
+    def computeModularity(cls, node2com, edge_weights):
         pass
 
     @classmethod
@@ -56,7 +58,7 @@ class Louvain(object):
         status = True
         while status:
             statuses = []
-            for node in sorted(list(node2com.keys())):
+            for node in list(node2com.keys()):
                 statuses = []
                 com_id = node2com[node]
                 neigh_nodes = sorted([edge[0] for edge in cls.getNeighborNodes(node, edge_weights)])
@@ -67,6 +69,7 @@ class Louvain(object):
                 communities = {}
                 for neigh_node in sorted(neigh_nodes):
                     node2com_copy = copy.deepcopy(node2com)
+                    print("copy: {}, neigh_nodes: {}".format(node2com_copy, neigh_nodes))
                     if node2com_copy[neigh_node] in communities:
                         continue
                     communities[node2com_copy[neigh_node]] = 1
@@ -78,7 +81,7 @@ class Louvain(object):
                     #                                                           cls.getNodeWeightInCluster(node, node2com_copy, edge_weights),
                     #                                                           cls.getTotWeight(node, node2com_copy, edge_weights),
                     #                                                           cls.getNodeWeights(node, edge_weights),
-                                                                               delta_q))
+                    #                                                           delta_q))
 
                     if delta_q > max_delta:
                         max_delta = delta_q
@@ -160,7 +163,7 @@ class Louvain(object):
         # initialize 
         node2com = {}
         edge_weights = {}
-        for idx, node in enumerate(sorted(graph.nodes())):
+        for idx, node in enumerate(graph.nodes()):
             node2com[node] = idx
             edge_weights[node] = {}
             for edge in graph[node].items():
