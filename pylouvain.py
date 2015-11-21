@@ -5,6 +5,7 @@ import sys
 import copy
 
 from itertools import permutations
+from itertools import combinations
 from collections import defaultdict
 
 class Louvain(object):
@@ -21,9 +22,10 @@ class Louvain(object):
     @classmethod
     def run(cls, graph):
         node2com, edge_weights = cls._setNode2Com(graph)
-        all_edge_weights = graph.size(weight="weight")
 
         node2com = cls._runFirstPhase(node2com, edge_weights)
+        best_modularity = cls.computeModularity(node2com, edge_weights)
+        print("modularity: {}".format(best_modularity))
         cls.show(node2com)
 
         partition = copy.deepcopy(node2com)
@@ -32,17 +34,41 @@ class Louvain(object):
 
         while True:
             new_node2com = cls._runFirstPhase(new_node2com, new_edge_weights)
+            modularity = cls.computeModularity(node2com, new_edge_weights)
+            if best_modularity == modularity:
+                break
             partition = cls._updatePartition(new_node2com, partition)
             _new_node2com, _new_edge_weights = cls._runSecondPhase(new_node2com, new_edge_weights)
-            if new_node2com == _new_node2com:
-                break
             new_node2com = _new_node2com
             new_edge_weights = _new_edge_weights
         return partition
 
     @classmethod
     def computeModularity(cls, node2com, edge_weights):
-        pass
+        q = 0
+        all_edge_weights = sum([weight for start in edge_weights.keys() for end, weight in edge_weights[start].items()]) / 2
+
+        com2node = defaultdict(list)
+        for node, com_id in node2com.items():
+            com2node[com_id].append(node)
+
+        for com_id, nodes in com2node.items():
+            node_combinations = list(combinations(nodes, 2)) + [(node, node) for node in nodes]
+            # weights = sum([edge_weights[node_pair[0]][node_pair[1]] for node_pair in node_combinations])
+            cluster_weight = 0.
+            for node_pair in node_combinations:
+                cluster_weight += edge_weights[node_pair[0]][node_pair[1]]
+            tot = cls.getDegreeOfCluster(nodes, node2com, edge_weights)
+            q += (cluster_weight / 2 * all_edge_weights) - (tot / 2 * all_edge_weights) ** 2
+            print("edge_weights: {}".format(edge_weights))
+            print("cluster_weight: {}, tot: {}".format(cluster_weight, tot))
+            print("partition[{}]: {}".format(com_id, nodes))
+        return q
+
+    @classmethod
+    def getDegreeOfCluster(cls, nodes, node2com, edge_weights):
+        weight = sum([sum(list(edge_weights[n].values())) for n in nodes])
+        return weight
 
     @classmethod
     def _updatePartition(cls, new_node2com, partition):
@@ -125,6 +151,7 @@ class Louvain(object):
 
         return new_node2com, new_edge_weights
 
+
     @classmethod
     def getTotWeight(cls, node, node2com, edge_weights):
         nodes = []
@@ -162,10 +189,9 @@ class Louvain(object):
     def _setNode2Com(cls, graph):
         # initialize 
         node2com = {}
-        edge_weights = {}
+        edge_weights = defaultdict(lambda : defaultdict(float))
         for idx, node in enumerate(graph.nodes()):
             node2com[node] = idx
-            edge_weights[node] = {}
             for edge in graph[node].items():
                 edge_weights[node][edge[0]] = edge[1]["weight"]
 
