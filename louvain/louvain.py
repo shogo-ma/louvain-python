@@ -2,12 +2,33 @@
 # coding: utf-8
 
 import copy
+import networkx as nx
 
 from itertools import permutations
 from itertools import combinations
 from collections import defaultdict
 
 class Louvain(object):
+    
+    @classmethod
+    def convertIGraphToNxGraph(cls, igraph):
+        node_names = igraph.vs["names"]
+        edge_list = igraph.get_edgelist()
+        weight_list = igraph.es["weight"]
+        node_dict = defaultdict(str)
+
+        for idx, node in enumerate(igraph.vs):
+            node_dict[node.index] = node_names[idx]
+
+        convert_list = []
+        for idx in range(len(edge_list)):
+            edge = edge_list[idx]
+            new_edge = (node_dict[edge[0]], node_dict[edge[1]], weight_list)
+            convert_list.append(new_edge)
+
+        convert_graph = nx.Graph()
+        convert_graph.add_weighted_edges_from(convert_list)
+        return convert_graph
 
     @classmethod
     def getBestPartition(cls, graph):
