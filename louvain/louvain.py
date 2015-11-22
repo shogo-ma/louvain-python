@@ -11,8 +11,8 @@ from collections import defaultdict
 class Louvain(object):
     
     @classmethod
-    def convertIGraphToNxGraph(igraph):
-        node_names = igraph.vs["names"]
+    def convertIGraphToNxGraph(cls, igraph):
+        node_names = igraph.vs["name"]
         edge_list = igraph.get_edgelist()
         weight_list = igraph.es["weight"]
         node_dict = defaultdict(str)
