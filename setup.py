@@ -7,4 +7,5 @@ setup(
     description="A implementation of louvain method on python",
     author="shogo-ma",
     packages=["louvain"],
+    install_requires=["networkx"],
 )
