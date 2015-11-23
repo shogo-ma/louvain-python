@@ -9,6 +9,7 @@ from collections import defaultdict
 
 class Louvain(object):
     def __init__(self):
+        self.MIN_VALUE = 0.0000001
         self.node_weights = {}
     
     @classmethod
@@ -49,7 +50,7 @@ class Louvain(object):
         while True:
             new_node2com = self._runFirstPhase(new_node2com, new_edge_weights)
             modularity = self.computeModularity(new_node2com, new_edge_weights)
-            if best_modularity == modularity:
+            if abs(best_modularity - modularity) < self.MIN_VALUE:
                 break
             best_modularity = modularity
             partition = self._updatePartition(new_node2com, partition)
