@@ -25,7 +25,8 @@ def makeSampleGraph():
 
 if __name__ == "__main__":
     sample_graph = makeSampleGraph()
-    partition = Louvain.getBestPartition(sample_graph)
+    louvain = Louvain()
+    partition = louvain.getBestPartition(sample_graph)
 
     p = defaultdict(list)
     for node, com_id in partition.items():
