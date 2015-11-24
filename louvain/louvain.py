@@ -38,18 +38,18 @@ class Louvain(object):
             node_weights[node] = sum([weight for weight in edge_weights[node].values()])
         return node_weights
 
-    def getBestPartition(self, graph):
+    def getBestPartition(self, graph, param=1.):
         node2com, edge_weights = self._setNode2Com(graph)
 
-        node2com = self._runFirstPhase(node2com, edge_weights)
-        best_modularity = self.computeModularity(node2com, edge_weights)
+        node2com = self._runFirstPhase(node2com, edge_weights, param)
+        best_modularity = self.computeModularity(node2com, edge_weights, param)
 
         partition = node2com.copy()
         new_node2com, new_edge_weights = self._runSecondPhase(node2com, edge_weights)
 
         while True:
-            new_node2com = self._runFirstPhase(new_node2com, new_edge_weights)
-            modularity = self.computeModularity(new_node2com, new_edge_weights)
+            new_node2com = self._runFirstPhase(new_node2com, new_edge_weights, param)
+            modularity = self.computeModularity(new_node2com, new_edge_weights, param)
             if abs(best_modularity - modularity) < self.MIN_VALUE:
                 break
             best_modularity = modularity
@@ -59,7 +59,7 @@ class Louvain(object):
             new_edge_weights = _new_edge_weights
         return partition
 
-    def computeModularity(self, node2com, edge_weights):
+    def computeModularity(self, node2com, edge_weights, param):
         q = 0
         all_edge_weights = sum([weight for start in edge_weights.keys() for end, weight in edge_weights[start].items()]) / 2
 
@@ -71,7 +71,7 @@ class Louvain(object):
             node_combinations = list(combinations(nodes, 2)) + [(node, node) for node in nodes]
             cluster_weight = sum([edge_weights[node_pair[0]][node_pair[1]] for node_pair in node_combinations])
             tot = self.getDegreeOfCluster(nodes, node2com, edge_weights)
-            q += (cluster_weight / (2 * all_edge_weights)) - (tot / (2 * all_edge_weights)) ** 2
+            q += (cluster_weight / (2 * all_edge_weights)) - param * ((tot / (2 * all_edge_weights)) ** 2)
         return q
 
     def getDegreeOfCluster(self, nodes, node2com, edge_weights):
@@ -88,7 +88,7 @@ class Louvain(object):
                 partition[old_com] = new_com_id
         return partition
 
-    def _runFirstPhase(self, node2com, edge_weights):
+    def _runFirstPhase(self, node2com, edge_weights, param):
         all_edge_weights = sum([weight for start in edge_weights.keys() for end, weight in edge_weights[start].items()]) / 2
         self.node_weights = self.updateNodeWeights(edge_weights)
         status = True
@@ -109,7 +109,7 @@ class Louvain(object):
                     communities[node2com_copy[neigh_node]] = 1
                     node2com_copy[node] = node2com_copy[neigh_node]
 
-                    delta_q = 2 * self.getNodeWeightInCluster(node, node2com_copy, edge_weights) - self.getTotWeight(node, node2com_copy, edge_weights) * self.node_weights[node] / all_edge_weights
+                    delta_q = 2 * self.getNodeWeightInCluster(node, node2com_copy, edge_weights) - (self.getTotWeight(node, node2com_copy, edge_weights) * self.node_weights[node] / all_edge_weights) * param
                     if delta_q > max_delta:
                         max_delta = delta_q
                         max_com_id = node2com_copy[neigh_node]
